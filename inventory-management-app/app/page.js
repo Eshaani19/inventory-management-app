@@ -1,5 +1,5 @@
 'use client'
-import {Box,Stack, Typography, Button, Modal, TextField, ThemeProvider, createTheme, CssBaseline, Paper, IconButton} from '@mui/material'
+import {Box,Stack, Typography, Button, Modal, TextField, ThemeProvider, createTheme, CssBaseline} from '@mui/material'
 import {collection, query,doc, getDocs, setDoc, deleteDoc, getDoc} from 'firebase/firestore'
 import {firestore} from './firebase';
 import { useEffect, useState } from 'react';
@@ -38,10 +38,13 @@ const style = {
 
 export default function Home() {
   const [pantry,setPantry] = useState([])
+  const [filteredPantry, setFilteredPantry] = useState([]);
   const [open, setOpen] = useState(false)
+  const [itemName, setItemName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('');
+
   const handleOpen = () => setOpen(true)
   const handleClose = () => setOpen(false)
-  const [itemName, setItemName] = useState('')
 
   const updatePantry = async() => {
     const snapshot = query(collection(firestore, 'pantry'))
@@ -51,11 +54,21 @@ export default function Home() {
       pantryList.push({name : doc.id, ...doc.data()})
     })
     setPantry(pantryList)
+    setFilteredPantry(pantryList);
   }
 
   useEffect(() => {
     updatePantry()
   }, [])
+
+  useEffect(() => {
+    const filtered = searchQuery
+      ? pantry.filter(item =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : pantry;
+    setFilteredPantry(filtered);
+  }, [searchQuery, pantry]);
 
   const addItem = async(item) => {
     const docRef = doc(collection(firestore,'pantry'), item)
@@ -86,92 +99,76 @@ export default function Home() {
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-    <Box
-      width = "100vw"
-      height = "100vh"
-      display = {'flex'}
-      justifyContent = {'center'}
-      flexDirection = {'column'}
-      alignItems = {'center'}
-      gap = {2}
-      bgcolor="background.default"
-      p={4}
-    > 
-    <Modal
-      open = {open}
-      onClose = {handleClose}
-      aria-labelledby = "modal-modal-title"
-      aria-describedby = "modal-modal-description"
-    >
-      <Box sx = {style}>
-        <Typography id = "modal-modal-title" variant='h6' component = 'h2'>
-          Add item
-        </Typography>
-        <Stack width="100%" direction={'row'} spacing={2}>
-          <TextField id="outlined-basic" label="item" variant = "outlined" fullWidth value={itemName}
-          onChange = {(e) => setItemName(e.target.value)} 
-          />
-          <Button variant="contained" onClick={() => {
-              addItem(itemName)
-              setItemName('')
-              handleClose()
-            }}> 
-            Add 
-          </Button>
-        </Stack>
-      </Box>
-    </Modal>
-    <Button variant="contained" color="primary" onClick={handleOpen} startIcon={<AddIcon />}> 
-      Add 
-    </Button>
-    <Box border={'1px solid #333'} borderRadius={4} overflow="hidden" boxShadow={3}>
-      <Box
-        width="800px"
-        height="100px"
-        bgcolor={'primary.main'}
-        display={'flex'}
-        justifyContent={'center'}
-        alignItems={'center'}
-      >
-      <Typography variant="h4" color="common.white" textAlign={'center'}>
-        Pantry Items
-      </Typography> 
-    </Box>
-    <Stack width = "100%" spacing = {2} overflow={'auto'} sx={{ mt: 2, maxHeight: 400, overflowY: 'auto' }}>
-      {pantry.map(({name,count}) =>  (
-        <Box
-          key={name}
-          width="100%"
-          minHeight="150px"
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          bgcolor={'#fff'}
-          paddingX={5}
-          borderBottom="1px solid #ddd"
-        >
-          <Typography variant = {'h6'} color={'#333'} textAlign={'center'}>
-            {
-              name.charAt(0).toUpperCase() + name.slice(1)
-            }
-          </Typography>
-          <Typography variant={'h6'} color={'#333'} textAlign={'center'}>
-            Quantity: {count}
-          </Typography>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', p: 3 }}>
+        <Stack spacing={3} alignItems="center">
+          <Typography variant="h4" sx={{ mb: 2 }}>Pantry Items</Typography>
           <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => removeItem(name)}
-            startIcon={<DeleteIcon />}
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleOpen}
           >
-            Remove
+            Add Item
           </Button>
+          <TextField
+            label="Search Items"
+            variant="outlined"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            fullWidth
+          />
+          <Box sx={{ maxHeight: 400, overflowY: 'auto', width: '100%' }}>
+            {filteredPantry.map((item) => (
+              <Stack
+                key={item.name}
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ p: 2, bgcolor: 'white', mb: 1, borderRadius: 1 }}
+              >
+                <Typography variant="body1">{item.name}</Typography>
+                <Typography variant="body1">Quantity: {item.count}</Typography>
+                <DeleteIcon
+                  color="secondary"
+                  onClick={() => removeItem(item.name)}
+                  sx={{ cursor: 'pointer' }}
+                />
+              </Stack>
+            ))}
           </Box>
-        ))}
-    </Stack>
-    </Box>
-    </Box>
+        </Stack>
+        <Modal
+          open={open}
+          onClose={handleClose}
+          aria-labelledby="modal-title"
+          aria-describedby="modal-description"
+        >
+          <Box sx={style}>
+            <Typography id="modal-title" variant="h6" component="h2">
+              Add a new item
+            </Typography>
+            <TextField
+              id="modal-description"
+              label="Item Name"
+              variant="outlined"
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              fullWidth
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                addItem(itemName);
+                setItemName('');
+                handleClose();
+              }}
+            >
+              Add Item
+            </Button>
+          </Box>
+        </Modal>
+      </Box>
     </ThemeProvider>
   );
 }
